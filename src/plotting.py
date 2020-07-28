@@ -89,10 +89,10 @@ def plot_mcdo_classification(args, model, dataset, params):
     with torch.no_grad():
         for _ in range(n_samples):
             emb = model(test_image[None, None, ...])
-            last_weight = dropout(last_weight_mu)
-            last_bias = dropout(last_bias_mu)
+            last_weight = last_weight_mu
+            last_bias = last_bias_mu
 
-            logits = emb @ last_weight + last_bias
+            logits = dropout(emb) @ last_weight + last_bias
             probs = torch.softmax(logits, dim=-1)
             y_pred = torch.argmax(probs, dim=-1)
             results.append(y_pred.cpu().item())
@@ -116,10 +116,10 @@ def plot_mcdo_classification(args, model, dataset, params):
             with torch.no_grad():
                 for _ in range(n_samples):
                     emb = model(test_image[None, None, ...])
-                    last_weight = dropout(last_weight_mu)
-                    last_bias = dropout(last_bias_mu)
+                    last_weight = last_weight_mu
+                    last_bias = last_bias_mu
 
-                    logits = emb @ last_weight + last_bias
+                    logits = dropout(emb) @ last_weight + last_bias
                     probs = torch.softmax(logits, dim=-1)
                     y_pred = torch.argmax(probs, dim=-1)
                     results.append(y_pred.cpu().item())
@@ -139,6 +139,8 @@ def plot_mcdo_classification(args, model, dataset, params):
 def mfg_regression_inference(args, model, dataset, params, val_id=0):
 
     last_weight_mu, last_weight_logvar, last_bias_mu, last_bias_logvar = params
+    std_normal = torch.distributions.Normal(loc=torch.tensor(0., device=args.device, dtype=args.torchType),
+                               scale=torch.tensor(1., device=args.device, dtype=args.torchType),)
     for batch in dataset.next_val_batch():
         test_image = batch[0][val_id].squeeze()
         test_label = batch[1][val_id]
@@ -175,6 +177,8 @@ def mfg_regression_inference(args, model, dataset, params, val_id=0):
     
     
 def mcdo_regression_inference(args, model, dataset, params, val_id=0):
+    std_normal = torch.distributions.Normal(loc=torch.tensor(0., device=args.device, dtype=args.torchType),
+                                   scale=torch.tensor(1., device=args.device, dtype=args.torchType),)
     last_weight_mu, last_bias_mu = params
     for batch in dataset.next_val_batch():
         test_image = batch[0][val_id].squeeze()
@@ -191,10 +195,10 @@ def mcdo_regression_inference(args, model, dataset, params, val_id=0):
                 emb = model(test_image[None, None, ...])
             else:
                 emb = model(test_image[None,  ...])
-            last_weight = dropout(last_weight_mu)
-            last_bias = dropout(last_bias_mu)
+            last_weight = last_weight_mu
+            last_bias = last_bias_mu
 
-            logits = emb @ last_weight + last_bias
+            logits = dropout(emb) @ last_weight + last_bias
             results.append(logits.cpu().item())
 
     print('Marginalized answer ', np.mean(results))

@@ -127,10 +127,12 @@ def train_model_mcdo(args, dataset, model):
     for ep in tqdm(range(num_epoches)):
         dropout.train()
         for x_train, y_train_labels in dataset.next_train_batch():
+            #####
             emb = model(x_train)
-            last_weight = dropout(last_weight_mu)
-            last_bias = dropout(last_bias_mu)
-            preds = emb @ last_weight + last_bias
+            last_weight = last_weight_mu
+            last_bias = last_bias_mu
+            #####
+            preds = dropout(emb) @ last_weight + last_bias
 
             if args['problem'] == 'classification':
                 log_likelihood = torch.distributions.Categorical(logits=preds).log_prob(y_train_labels).sum()
@@ -151,9 +153,9 @@ def train_model_mcdo(args, dataset, model):
             with torch.no_grad():
                 for x_val, y_val_labels in dataset.next_val_batch():
                     emb = model(x_val)
-                    last_weight = dropout(last_weight_mu)
-                    last_bias = dropout(last_bias_mu)
-                    logits = emb @ last_weight + last_bias
+                    last_weight = last_weight_mu
+                    last_bias = last_bias_mu
+                    logits = dropout(emb) @ last_weight + last_bias
                     if args['problem'] == 'classification':
                         probs = torch.softmax(logits, dim=-1)
                         y_pred = torch.argmax(probs, dim=-1)

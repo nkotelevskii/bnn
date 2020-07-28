@@ -10,7 +10,6 @@ def log_likelihood(model, params, dataset, args):
     torchType = args.torchType
     std_normal = torch.distributions.Normal(loc=torch.tensor(0., device=device, dtype=torchType),
                                    scale=torch.tensor(1., device=device, dtype=torchType),)
-#     bernoulli = torch.distributions.Bernoulli(p=0.5)
     log_n_IS = torch.log(torch.tensor(args.n_IS, device=device, dtype=torchType))
     nll_list = []
     with torch.no_grad():
@@ -37,9 +36,9 @@ def log_likelihood(model, params, dataset, args):
                     nll_samples = torch.empty((args.n_IS, test_batch.shape[0]))
                     emb = model(test_batch)
                     for i in range(args.n_IS):
-                        last_weight = dropout(last_weight_mu)
-                        last_bias = dropout(last_bias_mu)
-                        preds = emb @ last_weight + last_bias
+                        last_weight = last_weight_mu
+                        last_bias = last_bias_mu
+                        preds = dropout(emb) @ last_weight + last_bias
                         log_likelihood = torch.distributions.Categorical(logits=preds).log_prob(test_label)
                         nll_samples[i, :] = log_likelihood
                     nll_lse = torch.logsumexp(nll_samples, dim=0)
