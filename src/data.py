@@ -39,6 +39,12 @@ class Dataset():
         self.train_dataloader = DataLoader(train, batch_size=train_batch_size)
         self.val_dataloader = DataLoader(validation, batch_size=val_batch_size)
         
+        self.x_train = x_train
+        self.y_train = y_train
+        
+        self.x_val = x_val
+        self.y_val = y_val
+        
         if self.dataset_name.find('mnist') > -1:
             test = datasets.MNIST(root=f'./data/{self.dataset_name}', download=True, train=False)
             data_test = test.test_data.type(torchType).to(device)

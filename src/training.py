@@ -104,7 +104,7 @@ def train_model_mfg(args, dataset, model):
             print(f'Current KL is {KL.cpu().detach().numpy()}')
     
     
-    return model, [last_weight_mu, last_weight_logvar, last_bias_mu, last_bias_logvar]
+    return model, [last_weight_mu, last_weight_logvar, last_bias_mu, last_bias_logvar], [np.array(score_total).mean(), KL.cpu().detach().numpy()]
     
     
 def train_model_mcdo(args, dataset, model):
@@ -170,6 +170,6 @@ def train_model_mcdo(args, dataset, model):
             else:
                 print(f"Mean validation MSE at epoch number {ep} is {np.array(score_total).mean()}")
     
-    return model, [last_weight_mu, last_bias_mu]
+    return model, [last_weight_mu, last_bias_mu], [np.array(score_total).mean()]
     
     
