@@ -48,14 +48,24 @@ def train_model_mfg(args, dataset, model):
     last_bias_mu = nn.Parameter(torch.randn((1, args.num_classes), device=device, dtype=torchType))
     last_bias_logvar = nn.Parameter(torch.randn((1, args.num_classes), device=device, dtype=torchType))
     
+    
+    ## Best parameters
+    best_last_weight_mu = nn.Parameter(torch.randn((args['last_features'], args.num_classes), device=device, dtype=torchType))
+    best_last_weight_logvar = nn.Parameter(torch.randn((args['last_features'], args.num_classes), device=device, dtype=torchType))
+    best_last_bias_mu = nn.Parameter(torch.randn((1, args.num_classes), device=device, dtype=torchType))
+    best_last_bias_logvar = nn.Parameter(torch.randn((1, args.num_classes), device=device, dtype=torchType))
+    best_model = type(model)(args).to(args.device) # get a new instance
+    
     params = list(model.parameters()) + [last_weight_mu, last_weight_logvar] + [last_bias_mu, last_bias_logvar]
-    optimizer = torch.optim.Adam(params)
+    optimizer = torch.optim.Adam(params, lr=1e-3)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, np.linspace(start=10, stop=num_epoches, num=50), gamma=0.9)
     
     
     std_normal = torch.distributions.Normal(loc=torch.tensor(0., device=device, dtype=torchType),
                                        scale=torch.tensor(1., device=device, dtype=torchType),)
-    
+    best_mse = float('inf')
+    best_KL = float('inf')
+    current_tol = 0
     for ep in tqdm(range(num_epoches)):
         for x_train, y_train_labels in dataset.next_train_batch():
             emb = model(x_train)
@@ -102,9 +112,24 @@ def train_model_mfg(args, dataset, model):
             else:
                 print(f"Mean validation MSE at epoch number {ep} is {np.array(score_total).mean()}")
             print(f'Current KL is {KL.cpu().detach().numpy()}')
+
+            if (np.array(score_total).mean() < best_mse):
+                best_mse = np.array(score_total).mean()
+                current_tol = 0
+                
+                best_model.load_state_dict(model.state_dict())
+                best_last_weight_mu = last_weight_mu.clone()
+                best_last_weight_logvar = last_weight_logvar.clone()
+                best_last_bias_mu = last_bias_mu.clone()
+                best_last_bias_logvar = last_bias_logvar.clone()
+                best_KL = KL.cpu().detach().numpy()
+            else:
+                current_tol += 1
+                if (print_info * current_tol > args['early_stopping_tol']):
+                    break
     
     
-    return model, [last_weight_mu, last_weight_logvar, last_bias_mu, last_bias_logvar], [np.array(score_total).mean(), KL.cpu().detach().numpy()]
+    return best_model, [best_last_weight_mu, best_last_weight_logvar, best_last_bias_mu, best_last_bias_logvar], [best_mse, best_KL]
     
     
 def train_model_mcdo(args, dataset, model):
@@ -119,11 +144,17 @@ def train_model_mcdo(args, dataset, model):
     last_bias_mu = nn.Parameter(torch.randn((1, args.num_classes), device=device, dtype=torchType))
     dropout = Dropout_layer()
     
+    ## Best parameters
+    best_last_weight_mu = nn.Parameter(torch.randn((args['last_features'], args.num_classes), device=device, dtype=torchType))
+    best_last_bias_mu = nn.Parameter(torch.randn((1, args.num_classes), device=device, dtype=torchType))
+    best_model = type(model)(args).to(args.device) # get a new instance
+    
     params = list(model.parameters()) + [last_weight_mu, last_bias_mu]
-    optimizer = torch.optim.Adam(params)
+    optimizer = torch.optim.Adam(params, lr=1e-3)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, np.linspace(start=10, stop=num_epoches, num=50), gamma=0.9)
     
-    
+    best_mse = float('inf')
+    current_tol = 0
     for ep in tqdm(range(num_epoches)):
         dropout.train()
         for x_train, y_train_labels in dataset.next_train_batch():
@@ -169,7 +200,17 @@ def train_model_mcdo(args, dataset, model):
                 print(f"Mean validation accuracy at epoch number {ep} is {np.array(score_total).mean()}")
             else:
                 print(f"Mean validation MSE at epoch number {ep} is {np.array(score_total).mean()}")
+            if (np.array(score_total).mean() < best_mse):
+                best_mse = np.array(score_total).mean()
+                current_tol = 0
+                best_model.load_state_dict(model.state_dict())
+                best_last_weight_mu = last_weight_mu.clone()
+                best_last_bias_mu = last_bias_mu.clone()
+            else:
+                current_tol += 1
+                if (print_info * current_tol > args['early_stopping_tol']):
+                    break
     
-    return model, [last_weight_mu, last_bias_mu], [np.array(score_total).mean()]
+    return best_model, [best_last_weight_mu, best_last_bias_mu], [best_mse]
     
     

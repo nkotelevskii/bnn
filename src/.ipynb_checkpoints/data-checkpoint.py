@@ -36,7 +36,7 @@ class Dataset():
             
         train = TensorDataset(torch.tensor(x_train.reshape(x_shape), dtype=torchType, device=device), torch.tensor(y_train, dtype=torchType, device=device))
         validation = TensorDataset(torch.tensor(x_val.reshape(x_shape), dtype=torchType, device=device), torch.tensor(y_val, dtype=torchType, device=device))
-        self.train_dataloader = DataLoader(train, batch_size=train_batch_size)
+        self.train_dataloader = DataLoader(train, batch_size=train_batch_size, shuffle=True)
         self.val_dataloader = DataLoader(validation, batch_size=val_batch_size)
         
         self.x_train = x_train

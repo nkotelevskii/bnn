@@ -45,9 +45,13 @@ df_dict = {
     'val_mse': [],
     'kl': [],
           }
-
-for dataname in ['boston_housing', 'concrete', 'energy_efficiency', 'kin8nm', 'naval_propulsion', 'ccpp', 'protein_structure', 'yacht_hydrodynamics', 'year_prediction_msd']:
+# , 'protein_structure', 'yacht_hydrodynamics', 'year_prediction_msd'
+for dataname in ['boston_housing', 'concrete', 'energy_efficiency', 'kin8nm', 'naval_propulsion', 'ccpp']:
     args['dataset_name'] = dataname
+    if dataname in ['boston_housing']:
+        args['early_stopping_tol'] = 1000
+    else:
+        args['early_stopping_tol'] = 400
     if args['dataset_name'].find('mnist') > -1:
         args['num_epoches'] = 201
         args['print_info'] = 50
@@ -60,13 +64,15 @@ for dataname in ['boston_housing', 'concrete', 'energy_efficiency', 'kin8nm', 'n
     else:
         args['n_IS'] = 1000
         args['num_epoches'] = 15001
-        args['print_info'] = 1000
+        args['print_info'] = 50
         if dataname in ['year_prediction_msd']:
             args['train_batch_size'] = 200
+        elif dataname in ['concrete']:
+            args['train_batch_size'] = 50
         else:
             args['train_batch_size'] = 100
         args['val_dataset'] = 200
-        args['val_batch_size'] = 20
+        args['val_batch_size'] = 50
         args['test_batch_size'] = 10
         
     dataset = Dataset(args)
