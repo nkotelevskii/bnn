@@ -46,7 +46,7 @@ df_dict = {
     'kl': [],
           }
 # , 'protein_structure', 'yacht_hydrodynamics', 'year_prediction_msd'
-for dataname in ['boston_housing', 'concrete', 'energy_efficiency', 'kin8nm', 'naval_propulsion', 'ccpp']:
+for dataname in ['boston_housing', 'concrete', 'energy_efficiency', 'kin8nm', 'naval_propulsion', 'ccpp', 'protein_structure', 'yacht_hydrodynamics', 'year_prediction_msd']:
     args['dataset_name'] = dataname
     if dataname in ['boston_housing']:
         args['early_stopping_tol'] = 1000
@@ -62,7 +62,7 @@ for dataname in ['boston_housing', 'concrete', 'energy_efficiency', 'kin8nm', 'n
         args['val_batch_size'] = 100
         args['test_batch_size'] = 100
     else:
-        args['n_IS'] = 1000
+        args['n_IS'] = 5000
         args['num_epoches'] = 15001
         args['print_info'] = 50
         if dataname in ['year_prediction_msd']:

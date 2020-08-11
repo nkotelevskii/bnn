@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
+import pdb
 
 
 class Net_classification(nn.Module):
@@ -44,3 +46,124 @@ class Dropout_layer(nn.Module):
         self.dropout = nn.Dropout(p=0.5)
     def forward(self, x):
         return self.dropout(x)
+    
+    
+class HMC_vanilla(nn.Module):
+    def __init__(self, kwargs):
+        super(HMC_vanilla, self).__init__()
+        self.device = kwargs.device
+        self.N = kwargs.N
+
+        self.alpha_logit = torch.tensor(np.log(kwargs.alpha) - np.log(1. - kwargs.alpha), device=self.device)
+        self.gamma = torch.tensor(np.log(kwargs.gamma), device=self.device)
+        self.use_partialref = kwargs.use_partialref  # If false, we are using full momentum refresh
+        self.use_barker = kwargs.use_barker  # If false, we are using standard MH ration, otherwise Barker ratio
+        self.device_zero = torch.tensor(0., dtype=kwargs.torchType, device=self.device)
+        self.device_one = torch.tensor(1., dtype=kwargs.torchType, device=self.device)
+        self.uniform = torch.distributions.Uniform(low=self.device_zero,
+                                                   high=self.device_one)  # distribution for transition making
+        self.std_normal = torch.distributions.Normal(loc=self.device_zero, scale=self.device_one)
+
+    def _forward_step(self, q_old, x=None, k=None, target=None, p_old=None, flows=None):
+        """
+        The function makes forward step
+        Also, this function computes log_jacobian of the transformation
+        Input:
+        q_old - current position
+        x - data object (optional)
+        k - auxiliary variable
+        target - target class (optional)
+        p_old - auxilary variables for some types of transitions (like momentum for HMC)
+        Output:
+        q_new - new position
+        p_new - new momentum
+        """
+        gamma = torch.exp(self.gamma)
+        p_flipped = -p_old
+        q_old.requires_grad_(True)
+        p_ = p_flipped + gamma / 2. * self.get_grad(q=q_old, target=target, x=x,
+                                                    flows=flows)  # NOTE that we are using log-density, not energy!
+        q_ = q_old
+        for l in range(self.N):
+            q_ = q_ + gamma * p_
+            if (l != self.N - 1):
+                p_ = p_ + gamma * self.get_grad(q=q_, target=target, x=x,
+                                                flows=flows)  # NOTE that we are using log-density, not energy!
+        p_ = p_ + gamma / 2. * self.get_grad(q=q_, target=target, x=x,
+                                             flows=flows)  # NOTE that we are using log-density, not energy!
+
+        p_ = p_.detach()
+        q_ = q_.detach()
+        q_old.requires_grad_(False)
+
+        return q_, p_
+
+    def make_transition(self, q_old, p_old, target_distr, k=None, x=None, flows=None, args=None, get_prior=None,
+                        prior_flow=None):
+        """
+        Input:
+        q_old - current position
+        p_old - current momentum
+        target_distr - target distribution
+        x - data object (optional)
+        k - vector for partial momentum refreshment
+        args - dict of arguments
+        scales - if we train scales for momentum or not
+        Output:
+        q_new - new position
+        p_new - new momentum
+        log_jac - log jacobians of transformations
+        current_log_alphas - current log_alphas, corresponding to sampled decision variables
+        a - decision variables (0 or +1)
+        q_upd - proposal states
+        """
+        ### Partial momentum refresh
+        alpha = torch.sigmoid(self.alpha_logit)
+        if self.use_partialref:
+            p_ref = p_old * alpha + torch.sqrt(1. - alpha ** 2) * self.std_normal.sample(p_old.shape)
+        else:
+            p_ref = self.std_normal.sample(q_old.shape)
+
+        ############ Then we compute new points and densities ############
+#         pdb.set_trace()
+        q_upd, p_upd = self._forward_step(q_old=q_old, p_old=p_ref, k=k, target=target_distr, x=x, flows=flows)
+
+        target_log_density_f = target_distr.get_logdensity(z=q_upd, x=x) + self.std_normal.log_prob(p_upd).sum()
+        target_log_density_old = target_distr.get_logdensity(z=q_old, x=x) + self.std_normal.log_prob(p_ref).sum()
+
+        log_t = target_log_density_f - target_log_density_old
+        log_1_t = torch.logsumexp(torch.cat([torch.zeros_like(log_t).view(-1, 1),
+                                             log_t.view(-1, 1)], dim=-1), dim=-1)  # log(1+t)
+        if self.use_barker:
+            current_log_alphas_pre = log_t - log_1_t
+        else:
+            current_log_alphas_pre = torch.min(self.device_zero, log_t)
+
+        log_probs = torch.log(self.uniform.sample())
+        a = torch.where(log_probs < current_log_alphas_pre, self.device_one, self.device_zero)
+
+        if a==self.device_one:
+            q_new = q_upd
+            p_new = p_upd
+        else:
+            q_new = q_old
+            p_new = p_ref
+            
+        return q_new, p_new, None, None, a
+
+    def get_grad(self, q, target, x=None, flows=None):
+        q_init = q.detach().requires_grad_(True)
+        if flows:
+            log_jacobian = 0.
+            q_prev = q_init
+            q_new = q_init
+            for i in range(len(flows)):
+                q_new = flows[i](q_prev)
+                log_jacobian += flows[i].log_abs_det_jacobian(q_prev, q_new)
+                q_prev = q_new
+            s = target.get_logdensity(x=x, z=q_new) + log_jacobian
+            grad = torch.autograd.grad(s.sum(), q_init)[0]
+        else:
+            s = target.get_logdensity(x=x, z=q_init)
+            grad = torch.autograd.grad(s.sum(), q_init)[0]
+        return grad
