@@ -38,11 +38,11 @@ class Prior(nn.Module):
             raise NotImplementedError('Prior type is not implemented yet') 
         
     def calculate_kl_normal(self, z, z_0, mu_q, sig_q, mu_prior, sig_prior):
-        kl = 0.5 * (2 * torch.log(sig_prior / sig_q) - 1 + (sig_q / sig_prior).pow(2) + ((mu_prior - mu_q) / sig_prior).pow(2)).mean()
+        kl = 0.5 * (2 * torch.log(sig_prior / sig_q) - 1 + (sig_q / sig_prior).pow(2) + ((mu_prior - mu_q) / sig_prior).pow(2)).sum()
         return kl
     
     def calculate_kl_general(self, z, z_0, mu_q, sig_q, mu_prior, sig_prior):
-        kl = (torch.distributions.Normal(mu_q, sig_q).log_prob(z_0) - torch.distributions.Normal(mu_prior, sig_prior).log_prob(z)).mean()
+        kl = (torch.distributions.Normal(mu_q, sig_q).log_prob(z_0) - torch.distributions.Normal(mu_prior, sig_prior).log_prob(z)).sum()
         return kl
 
 
@@ -82,8 +82,8 @@ class DiagPriorModule(nn.Module):
         if aux['var_family_type'] == 'standard':
             self.variational_transform_w = lambda x: x
             self.variational_transform_b = lambda x: x
-            self.compute_logjacobian_w = lambda x, y: 0
-            self.compute_logjacobian_b = lambda x, y: 0
+            self.compute_logjacobian_w = lambda x, y: torch.tensor(0., device=aux['device'], dtype=torch.float32)
+            self.compute_logjacobian_b = lambda x, y: torch.tensor(0., device=aux['device'], dtype=torch.float32)
         elif aux['var_family_type'] == 'IAF':
             self.w_flow = AffineAutoregressive(AutoRegressiveNN(shape[1], [3 * shape[1]]), stable=True)
             self.variational_transform_w = self.w_flow
@@ -111,7 +111,7 @@ class DiagPriorModule(nn.Module):
         kl = self.prior.kl_weights(self.w, self.w_0, self.weight_mu, self.get_weight_sigma())
         if self.use_bias:
             kl += self.prior.kl_bias(self.b, self.b_0, self.bias_mu, self.get_bias_sigma())
-        return (kl -self.log_jac_w - self.log_jac_b).mean()
+        return kl + (-self.log_jac_w - self.log_jac_b).sum()
 
     def func(self, input, weight, bias):
         pass
@@ -152,7 +152,7 @@ class BBBLinear(DiagPriorModule):
         bias
         priors
         """
-
+#         pdb.set_trace()
         self.in_features = in_features
         self.out_features = out_features
 

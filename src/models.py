@@ -40,6 +40,52 @@ class Net_regression(nn.Module):
         h5 = self.activation(self.linear2(h4))
         return h5
     
+    
+    
+class LastLayerBNN(nn.Module):
+    def __init__(self, in_features, last_features=10, aux={}):
+        super().__init__()
+
+        self.layer1 = nn.Linear(in_features, 4*in_features)
+        self.layer2 = nn.Linear(4*in_features, last_features)
+        self.layer3 = BBBLinear(last_features, 1, aux=aux)
+        self.device = aux.device
+        self.std_normal = torch.distributions.Normal(loc=torch.tensor(0., dtype=torch.float32, device=self.device),
+                                             scale=torch.tensor(1., dtype=torch.float32, device=self.device))
+
+    def get_kl(self):
+        return self.layer3.get_kl()
+
+    def forward(self, input, sample=True):
+        h = F.leakyrelu(self.layer1(input))
+        h = F.leakyrelu(self.layer2(h))
+        h = self.layer3(h, sample=sample)
+        
+        return h
+    
+class BNN(nn.Module):
+    def __init__(self, in_features, last_features=10, aux={}):
+        super().__init__()
+
+        self.layer1 = BBBLinear(in_features, 4*in_features, aux=aux)
+        self.layer2 = BBBLinear(4*in_features, last_features, aux=aux)
+        self.layer3 = BBBLinear(last_features, 1, aux=aux)
+
+    def get_kl(self):
+        return self.layer1.get_kl() + self.layer2.get_kl() + self.layer3.get_kl()
+
+    def forward(self, input, sample=True):
+#         pdb.set_trace()
+        h = F.leaky_relu(self.layer1(input, sample=sample))
+        h = F.leaky_relu(self.layer2(h, sample=sample))
+        h = self.layer3(h, sample=sample)
+        
+        return h
+    
+    
+    
+    
+    
 class Dropout_layer(nn.Module):
     def __init__(self,):
         super(Dropout_layer, self).__init__()
