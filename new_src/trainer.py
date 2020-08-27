@@ -1,6 +1,7 @@
 from tqdm import tqdm
 
 import numpy as np
+import math
 
 import torch
 import torch.nn as nn
@@ -20,10 +21,11 @@ def train_vi_regression_kl_explicit(model, prior, dataset, device, num_epochs=10
 
     params = list(model.parameters())
     optimizer = torch.optim.Adam(params, lr=1e-1)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=500, gamma=0.5)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.75)
 
     loss_fn = nn.MSELoss(reduction='none')
     model.train(True)
+    num_batches = math.ceil(dataset.x_train.shape[0] / dataset.train_dataloader.batch_size)
 
     for ep in tqdm(range(1, num_epochs + 1)):
         for batch_idx, (x, y) in enumerate(dataset.train_dataloader):
@@ -36,7 +38,7 @@ def train_vi_regression_kl_explicit(model, prior, dataset, device, num_epochs=10
             for p in model.parameters():
                 prior_log_prob += prior.log_prob(p)
             kl = varfamily_log_prob - prior_log_prob
-            elbo = log_likelihood - kl / len(dataset.train_dataloader)
+            elbo = log_likelihood - kl / num_batches
             (-elbo).backward()
             optimizer.step()
         scheduler.step()

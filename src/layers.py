@@ -29,8 +29,8 @@ class Prior(nn.Module):
             self.prior_bias_sampler = lambda x: self.prior_bias.sample(x)
             
             if aux['var_family_type'] == 'standard':
-                self.kl_weights = lambda w, w_0, w_mu, w_sigma: self.calculate_kl_normal(w, w_0, w_mu, w_sigma, self.prior_mu, self.prior_sigma)
-                self.kl_bias = lambda b, b_0, b_mu, b_sigma: self.calculate_kl_normal(b, b_0, b_mu, b_sigma, self.prior_bias_mu, self.prior_bias_sigma)
+                self.kl_weights = lambda w, w_0, w_mu, w_sigma: self.calculate_kl_general(w, w_0, w_mu, w_sigma, self.prior_mu, self.prior_sigma)
+                self.kl_bias = lambda b, b_0, b_mu, b_sigma: self.calculate_kl_general(b, b_0, b_mu, b_sigma, self.prior_bias_mu, self.prior_bias_sigma)
             else:
                 self.kl_weights = lambda w, w_0, w_mu, w_sigma: self.calculate_kl_general(w, w_0, w_mu, w_sigma, self.prior_mu, self.prior_sigma)
                 self.kl_bias = lambda b, b_0, b_mu, b_sigma: self.calculate_kl_general(b, b_0, b_mu, b_sigma, self.prior_bias_mu, self.prior_bias_sigma)

@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from pyro.distributions.transforms import AffineAutoregressive
 from pyro.nn import AutoRegressiveNN
+import pdb
 
 
 
@@ -116,6 +117,7 @@ class NF(MeanField):
         self.transform_b = self.get_transform_b()
 
     def get_weight_sample(self):
+        pdb.set_trace()
         w_0 = torch.distributions.Normal(self.weight_mu, self.get_weight_sigma()).rsample().view(1, -1)
         self.jac_w = 0.
         for t in self.transform_w:
